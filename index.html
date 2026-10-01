@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platforms Ahead</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #06060f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: 'Orbitron', monospace;
+    }
+
+    #game-wrapper {
+      position: relative;
+      /* size is set by JS via resizeCanvas() */
+    }
+
+    canvas {
+      display: block;
+      border: 1.5px solid rgba(100,200,255,0.2);
+      box-shadow:
+        0 0 50px rgba(80,160,255,0.18),
+        0 0 120px rgba(70,0,200,0.12);
+      border-radius: 6px;
+    }
+
+    /* ── HUD ── */
+    #hud {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      pointer-events: none;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 5;
+    }
+    .hud-panel {
+      background: rgba(5,5,22,0.72);
+      border: 1px solid rgba(100,200,255,0.2);
+      border-radius: 8px;
+      padding: 7px 13px;
+      backdrop-filter: blur(8px);
+    }
+    .hud-label {
+      font-size: 8px;
+      letter-spacing: 2.5px;
+      color: rgba(100,200,255,0.55);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .hud-value {
+      font-size: 20px;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 0 10px rgba(100,200,255,0.75);
+      line-height: 1;
+    }
+
+    /* ── Legend ── */
+    #legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      z-index: 5;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+    }
+    .legend-dot { width: 22px; height: 5px; border-radius: 2px; }
+
+    /* ── Controls hint ── */
+    #controls-hint {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      pointer-events: none;
+      z-index: 5;
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      text-align: right;
+      line-height: 1.9;
+    }
+    #controls-hint kbd {
+      display: inline-block;
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      color: rgba(100,200,255,0.7);
+    }
+
+    /* ── Overlay (start / game-over) ── */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5,5,20,0.88);
+      backdrop-filter: blur(10px);
+      border-radius: 6px;
+      z-index: 10;
+    }
+    #overlay h1 {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 900;
+      letter-spacing: 5px;
+      color: #fff;
+      text-shadow: 0 0 30px rgba(100,200,255,0.9);
+      margin-bottom: 4px;
+    }
+    .sub {
+      font-size: 11px;
+      letter-spacing: 5px;
+      color: rgba(100,200,255,0.65);
+      margin-bottom: 28px;
+    }
+    .instructions {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+      text-align: center;
+      line-height: 2.1;
+      margin-bottom: 30px;
+    }
+    .instructions span       { color: rgba(100,200,255,0.9); font-weight: 600; }
+    .instructions span.atk  { color: #ffcc44; }
+    .instructions span.dmg  { color: #ff4060; }
+
+    #start-btn, .action-btn {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      padding: 13px 36px;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      background: linear-gradient(135deg, #00e5ff, #7b2fff);
+      color: #fff;
+      text-transform: uppercase;
+      box-shadow: 0 0 24px rgba(100,200,255,0.4);
+      transition: transform 0.14s, box-shadow 0.14s;
+    }
+    #start-btn:hover, .action-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 36px rgba(100,200,255,0.7);
+    }
+  </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-panel">
+      <div class="hud-label">Platforms</div>
+      <div class="hud-value" id="hud-platforms">0</div>
+    </div>
+    <div class="hud-panel">
+      <div class="hud-label">Height</div>
+      <div class="hud-value" id="hud-height">0m</div>
+    </div>
+    <div class="hud-panel">
+      <div class="hud-label">Best</div>
+      <div class="hud-value" id="hud-best">0</div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div id="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#5dce9e"></div>Normal
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:rgba(140,220,255,0.7)"></div>Glass — breaks
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#f0933a"></div>Moving
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#d63031"></div>Danger ☠
+    </div>
+  </div>
+
+  <!-- Controls hint -->
+  <div id="controls-hint">
+    <kbd>A</kbd> / <kbd>D</kbd> move<br>
+    <kbd>W</kbd> / <kbd>Space</kbd> jump<br>
+    <kbd>W</kbd> × 2 double jump<br>
+    <kbd>E</kbd> attack
+  </div>
+
+  <!-- Start overlay -->
+  <div id="overlay">
+    <h1>PLATFORMS</h1>
+    <div class="sub">A H E A D</div>
+    <div class="instructions">
+      <span>A / D &nbsp;←→</span> — Move &nbsp;|&nbsp; <span>W / Space / ↑</span> — Jump<br>
+      <span class="atk">E</span> — Attack creatures &nbsp;|&nbsp; <span>W × 2</span> — Double jump<br>
+      Land on platforms to climb higher &amp; higher.<br>
+      <span style="color:rgba(140,220,255,0.8)">Glass</span> platforms shatter after landing.<br>
+      Avoid <span class="dmg">red creatures</span> — or swing to kill them!
+    </div>
+    <button id="start-btn">START CLIMBING</button>
+  </div>
+</div>
+
+<script src="./game.js"></script>
+</body>
+</html>
