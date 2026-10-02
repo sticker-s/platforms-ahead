@@ -2,9 +2,10 @@ const canvas = document.getElementById('gameCanvas')
 const c = canvas.getContext('2d')
 
 function resizeCanvas() {
-  canvas.width = Math.min(window.innerWidth, 820)
-  canvas.height = Math.min(window.innerHeight, 960)
   const wrapper = document.getElementById('game-wrapper')
+  // Vertical game: cap width to 720px for a comfortable playing field; fill full height
+  canvas.width = Math.min(window.innerWidth, 720)
+  canvas.height = window.innerHeight
   if (wrapper) {
     wrapper.style.width = canvas.width + 'px'
     wrapper.style.height = canvas.height + 'px'
@@ -14,7 +15,7 @@ resizeCanvas()
 window.addEventListener('resize', resizeCanvas)
 
 const GRAVITY = 0.28
-const JUMP_FORCE = -9.5
+const JUMP_FORCE = -10
 const PLAYER_SPD = 3.2
 const PLAT_H = 14
 const SPAWN_ABOVE = 220
@@ -34,13 +35,13 @@ let frameCount = 0
 
 let attackTimer = 0
 const ATTACK_DUR = 28
-const ATTACK_RANGE = 70
+const ATTACK_RANGE = 150
 let attackCycle = 0
 let attackPressed = false
 
 const player = {
   x: 0, y: 0,
-  w: 32, h: 42,
+  w: 25, h: 34,
   vx: 0, vy: 0,
   onGround: false,
   facingRight: true,
@@ -102,7 +103,7 @@ function drawPlayer() {
     }
   }
 
-  const scale = 1
+  const scale = 1.26
   const fw = sp.image.width / sp.frameRate
   const fh = sp.image.height
   const dw = fw * scale
@@ -137,10 +138,12 @@ function createPlatform(worldY, forceType) {
     else if (depth > 0.6 && rand < 0.22) type = 'glass'
     else if (depth > 0.3 && rand < 0.20) type = 'moving'
   }
-  const minW = canvas.width * 0.14
-  const maxW = canvas.width * 0.28
+  // Use a fixed minimum edge margin for ALL platform types to prevent
+  // any platform from touching or bleeding into the left/right boundary voids.
+  const edgeMargin = 48
+  const minW = canvas.width * 0.10
+  const maxW = canvas.width * 0.22
   const w = minW + Math.random() * (maxW - minW)
-  const edgeMargin = type === 'danger' ? canvas.width * 0.22 : 24
   const maxX = canvas.width - w - edgeMargin
   const platX = edgeMargin + Math.random() * Math.max(0, maxX - edgeMargin)
   return {
@@ -177,7 +180,30 @@ function platformGap() {
 
 function spawnMorePlatforms() {
   while (spawnY > cameraY - SPAWN_ABOVE) {
-    platforms.push(createPlatform(spawnY))
+    const newPlat = createPlatform(spawnY)
+    platforms.push(newPlat)
+    // If a danger platform spawned, always add a safe companion platform
+    // positioned directly beside it so the player has a way to pass.
+    if (newPlat.type === 'danger') {
+      const safePlatW = canvas.width * 0.14
+      // Try to place the safe platform to the right first; fall back to left
+      let safeX = newPlat.x + newPlat.w + 20
+      if (safeX + safePlatW > canvas.width - 48) {
+        safeX = newPlat.x - safePlatW - 20
+      }
+      safeX = Math.max(48, Math.min(canvas.width - safePlatW - 48, safeX))
+      platforms.push({
+        x: safeX,
+        y: spawnY,
+        w: safePlatW,
+        h: PLAT_H,
+        type: 'normal',
+        broken: false, crackTimer: 0, cracking: false,
+        dir: 1, speed: 0,
+        counted: false,
+        glowPhase: Math.random() * Math.PI * 2,
+      })
+    }
     spawnY -= platformGap()
   }
 }
@@ -186,26 +212,32 @@ function cullPlatforms() {
   platforms = platforms.filter(p => p.y < cameraY + canvas.height + CULL_BELOW)
 }
 
+function getClimbedHeight() {
+  const startY = canvas.height * 0.75
+  return Math.max(0, Math.round((startY - highestReached) / 8))
+}
+
 function createCreature(worldY) {
   const fromLeft = Math.random() < 0.5
-  const cw = 34, ch = 34
+  const cw = 46, ch = 46
+  const spawnX = fromLeft ? -cw : canvas.width
   return {
-    x: fromLeft ? -cw : canvas.width,
+    x: spawnX,
     y: worldY,
     w: cw, h: ch,
-    vx: (fromLeft ? 1 : -1) * (0.5 + Math.random() * 0.8),
+    vx: (fromLeft ? 1 : -1) * (0.4 + Math.random() * 0.3),
     animPhase: Math.random() * Math.PI * 2,
     alive: true,
-    hp: 2,
+    hp: 1,
     hitFlash: 0,
   }
 }
 
 function spawnCreatureIfNeeded() {
-  const currentHeight = Math.max(0, Math.round(Math.abs(highestReached) / 8))
-  // Lowered threshold from 100m to 10m, and reduced frame interval from 380 to 220 for quicker spawns
-  if (currentHeight >= 10 && frameCount % 220 === 0) {
-    const worldY = cameraY + 60 + Math.random() * (canvas.height * 0.55)
+  const height = getClimbedHeight()
+  // Spawn creatures at halved rate (every 240 frames ~4s, max 2 active creatures)
+  if (frameCount % 240 === 0 && creatures.length < 2) {
+    const worldY = cameraY + canvas.height * 0.15 + Math.random() * (canvas.height * 0.45)
     creatures.push(createCreature(worldY))
   }
 }
@@ -219,12 +251,13 @@ function doAttack() {
   player.sprites[keyName].elapsed = 0
   switchSprite(keyName)
 
+  // Huge attack range box covering both sides and surrounding vertical space
   const hbX = player.facingRight
-    ? player.x + player.w
+    ? player.x - 30
     : player.x - ATTACK_RANGE
-  const hbY = player.y + player.h * 0.1
-  const hbW = ATTACK_RANGE
-  const hbH = player.h * 0.8
+  const hbY = player.y - 40
+  const hbW = ATTACK_RANGE + 60
+  const hbH = player.h + 80
 
   for (const cr of creatures) {
     if (!cr.alive) continue
@@ -234,15 +267,10 @@ function doAttack() {
       hbY < cr.y + cr.h &&
       hbY + hbH > cr.y
     ) {
-      cr.hp--
-      cr.hitFlash = 12
-      if (cr.hp <= 0) {
-        cr.alive = false
-        spawnParticles(cr.x + cr.w / 2, cr.y + cr.h / 2, '#ff6060', 14)
-        spawnParticles(cr.x + cr.w / 2, cr.y + cr.h / 2, '#ffcc00', 6)
-      } else {
-        spawnParticles(cr.x + cr.w / 2, cr.y + cr.h / 2, '#ff9900', 5)
-      }
+      cr.hp = 0
+      cr.alive = false
+      spawnParticles(cr.x + cr.w / 2, cr.y + cr.h / 2, '#ff4060', 16)
+      spawnParticles(cr.x + cr.w / 2, cr.y + cr.h / 2, '#ffcc00', 8)
     }
   }
 
@@ -338,7 +366,7 @@ const hudHeight = document.getElementById('hud-height')
 const hudBest = document.getElementById('hud-best')
 
 function updateHUD() {
-  const height = Math.max(0, Math.round(Math.abs(highestReached) / 8))
+  const height = getClimbedHeight()
   hudPlatforms.textContent = platformCount
   hudHeight.textContent = height + 'm'
   hudBest.textContent = bestPlatforms
@@ -510,10 +538,16 @@ function updateCreatures() {
   for (const cr of creatures) {
     if (!cr.alive) continue
     cr.x += cr.vx
-    if (cr.x < 0 || cr.x + cr.w > canvas.width) cr.vx *= -1
+    if (cr.x < 0 && cr.vx < 0) {
+      cr.x = 0
+      cr.vx = Math.abs(cr.vx)
+    } else if (cr.x + cr.w > canvas.width && cr.vx > 0) {
+      cr.x = canvas.width - cr.w
+      cr.vx = -Math.abs(cr.vx)
+    }
     if (cr.hitFlash > 0) cr.hitFlash--
   }
-  creatures = creatures.filter(cr => cr.alive && cr.y < cameraY + canvas.height + CULL_BELOW)
+  creatures = creatures.filter(cr => cr.alive && cr.y < cameraY + canvas.height + CULL_BELOW && cr.y > cameraY - 400)
 }
 
 function updateParticles() {
@@ -654,45 +688,48 @@ function drawCreature(cr) {
   if (cr.hitFlash > 0) {
     c.fillStyle = `rgba(255,255,255,${cr.hitFlash / 12})`
     c.shadowColor = '#ffffff'
-    c.shadowBlur = 16
+    c.shadowBlur = 18
   } else {
-    c.fillStyle = '#c0392b'
-    c.shadowColor = '#ff0000'
-    c.shadowBlur = 12
+    c.fillStyle = '#ff2244'
+    c.shadowColor = '#ff0033'
+    c.shadowBlur = 16
   }
 
   c.beginPath()
   c.ellipse(cr.x + cr.w / 2, sy + cr.h / 2, rx, ry, 0, 0, Math.PI * 2)
   c.fill()
+  c.strokeStyle = '#ff8899'
+  c.lineWidth = 1.5
+  c.stroke()
   c.shadowBlur = 0
 
   if (cr.hitFlash <= 0) {
     const eyeDir = cr.vx > 0 ? 6 : -6
     c.fillStyle = '#fff'
     c.beginPath()
-    c.arc(cr.x + cr.w / 2 + eyeDir - 4, sy + 11, 3.5, 0, Math.PI * 2)
-    c.arc(cr.x + cr.w / 2 + eyeDir + 4, sy + 11, 3.5, 0, Math.PI * 2)
+    c.arc(cr.x + cr.w / 2 + eyeDir - 4, sy + 11, 4, 0, Math.PI * 2)
+    c.arc(cr.x + cr.w / 2 + eyeDir + 4, sy + 11, 4, 0, Math.PI * 2)
     c.fill()
     c.fillStyle = '#111'
     c.beginPath()
-    c.arc(cr.x + cr.w / 2 + eyeDir - 4, sy + 11, 1.8, 0, Math.PI * 2)
-    c.arc(cr.x + cr.w / 2 + eyeDir + 4, sy + 11, 1.8, 0, Math.PI * 2)
+    c.arc(cr.x + cr.w / 2 + eyeDir - 4, sy + 11, 2, 0, Math.PI * 2)
+    c.arc(cr.x + cr.w / 2 + eyeDir + 4, sy + 11, 2, 0, Math.PI * 2)
     c.fill()
 
     const barW = cr.w
-    c.fillStyle = 'rgba(0,0,0,0.4)'
+    c.fillStyle = 'rgba(0,0,0,0.6)'
     c.fillRect(cr.x, sy - 10, barW, 4)
-    c.fillStyle = cr.hp >= 2 ? '#2ecc71' : '#e74c3c'
-    c.fillRect(cr.x, sy - 10, barW * (cr.hp / 2), 4)
+    c.fillStyle = '#00ff88'
+    c.fillRect(cr.x, sy - 10, barW, 4)
 
-    c.strokeStyle = '#922b21'
+    c.strokeStyle = '#ff6677'
     c.lineWidth = 2.5
     for (let i = 0; i < 4; i++) {
-      const lx = cr.x + 4 + i * 7
+      const lx = cr.x + 4 + i * 8
       const phase = cr.animPhase + i * 0.9
       c.beginPath()
       c.moveTo(lx, sy + cr.h - 4)
-      c.lineTo(lx + Math.sin(phase) * 4, sy + cr.h + 7)
+      c.lineTo(lx + Math.sin(phase) * 5, sy + cr.h + 8)
       c.stroke()
     }
   }
@@ -722,7 +759,7 @@ let milestoneTimer = 0
 const MILESTONES = new Set([5, 10, 20, 50, 100, 200, 500, 1000])
 
 function checkMilestone() {
-  const height = Math.max(0, Math.round(Math.abs(highestReached) / 8))
+  const height = getClimbedHeight()
   if (MILESTONES.has(height)) {
     if (milestoneMsg !== `${height}m`) {
       milestoneMsg = `${height}m`
@@ -778,7 +815,7 @@ function drawAttackArc() {
 const overlay = document.getElementById('overlay')
 
 function showGameOver() {
-  const height = Math.max(0, Math.round(Math.abs(highestReached) / 8))
+  const height = getClimbedHeight()
 
   // Notify React to submit score to the leaderboard
   if (typeof window.__onGameOver === 'function') {
@@ -813,7 +850,6 @@ document.getElementById('start-btn').addEventListener('click', startGame)
 function startGame() {
   overlay.style.display = 'none'
   platformCount = 0
-  highestReached = 0
   cameraY = 0
   frameCount = 0
   attackTimer = 0
@@ -822,8 +858,9 @@ function startGame() {
   milestoneTimer = 0
   creatures = []
   particles = []
-  player.x = canvas.width / 2 - 16
+  player.x = canvas.width / 2 - player.w / 2
   player.y = canvas.height * 0.75
+  highestReached = player.y
   player.vx = 0
   player.vy = 0
   player.dead = false
@@ -872,8 +909,9 @@ function gameLoop() {
 }
 
 initStars()
-player.x = canvas.width / 2 - 16
+player.x = canvas.width / 2 - player.w / 2
 player.y = canvas.height * 0.75
+highestReached = player.y
 spawnInitialPlatforms()
 hudBest.textContent = bestPlatforms
 gameLoop()
