@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
+import { audioManager } from '../audioManager'
 import styles from './GamePage.module.css'
 
 export default function GamePage({ user, onBack }) {
@@ -8,6 +9,15 @@ export default function GamePage({ user, onBack }) {
   const [scoreSubmitted, setScoreSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [lastScore, setLastScore] = useState(null)
+  const [isMuted, setIsMuted] = useState(audioManager.isMuted())
+
+  useEffect(() => {
+    return audioManager.subscribe(muted => setIsMuted(muted))
+  }, [])
+
+  const handleToggleMute = () => {
+    audioManager.toggleMute()
+  }
 
   // Expose a callback that the game script can call on game-over
   useEffect(() => {
@@ -50,10 +60,15 @@ export default function GamePage({ user, onBack }) {
 
   return (
     <div className={styles.page}>
-      {/* Back button */}
-      <button id="back-to-home" className={styles.backBtn} onClick={onBack}>
-        ← HOME
-      </button>
+      {/* Top Bar Controls */}
+      <div className={styles.topControls}>
+        <button id="back-to-home" className={styles.backBtn} onClick={onBack}>
+          ← HOME
+        </button>
+        <button id="game-music-toggle-btn" className={styles.musicBtn} onClick={handleToggleMute}>
+          {isMuted ? '🔇 MUTED' : '🔊 MUSIC'}
+        </button>
+      </div>
 
       {/* Score toast */}
       {scoreSubmitted && lastScore && (

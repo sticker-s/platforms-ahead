@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
+import { audioManager } from '../audioManager'
 import styles from './HomePage.module.css'
 
 const MEDAL = ['🥇', '🥈', '🥉']
@@ -28,6 +29,15 @@ export default function HomePage({ user, onLogout, onPlay }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [userBest, setUserBest] = useState(null)
+  const [isMuted, setIsMuted] = useState(audioManager.isMuted())
+
+  useEffect(() => {
+    return audioManager.subscribe(muted => setIsMuted(muted))
+  }, [])
+
+  const handleToggleMute = () => {
+    audioManager.toggleMute()
+  }
 
   const fetchLeaderboard = useCallback(async () => {
     setLoading(true)
@@ -75,6 +85,9 @@ export default function HomePage({ user, onLogout, onPlay }) {
           <span className={styles.headerSub}>VERTICAL PLATFORMER</span>
         </div>
         <div className={styles.headerRight}>
+          <button id="music-toggle-btn" className={styles.audioBtn} onClick={handleToggleMute}>
+            {isMuted ? '🔇 MUSIC OFF' : '🔊 MUSIC ON'}
+          </button>
           <div className={styles.userBadge}>
             <div className={styles.userAvatar}>{user.username[0].toUpperCase()}</div>
             <div className={styles.userInfo}>

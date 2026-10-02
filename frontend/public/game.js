@@ -370,6 +370,9 @@ function updateHUD() {
   hudPlatforms.textContent = platformCount
   hudHeight.textContent = height + 'm'
   hudBest.textContent = bestPlatforms
+  if (window.__audioManager) {
+    window.__audioManager.updateHeight(height)
+  }
 }
 
 const keys = { left: false, right: false, jump: false, attack: false }
@@ -816,6 +819,9 @@ const overlay = document.getElementById('overlay')
 
 function showGameOver() {
   const height = getClimbedHeight()
+  if (window.__audioManager) {
+    window.__audioManager.pauseAll()
+  }
 
   // Notify React to submit score to the leaderboard
   if (typeof window.__onGameOver === 'function') {
@@ -848,6 +854,9 @@ function showGameOver() {
 document.getElementById('start-btn').addEventListener('click', startGame)
 
 function startGame() {
+  if (window.__audioManager) {
+    window.__audioManager.playTrack(1)
+  }
   overlay.style.display = 'none'
   platformCount = 0
   cameraY = 0

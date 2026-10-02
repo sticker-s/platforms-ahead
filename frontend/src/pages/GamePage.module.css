@@ -12,16 +12,21 @@
   padding: 0;
 }
 
-.backBtn {
+.topControls {
   position: absolute;
   top: 12px;
   left: 12px;
   z-index: 100;
+  display: flex;
+  gap: 8px;
+}
+
+.backBtn, .musicBtn {
   font-family: 'Orbitron', monospace;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 2px;
-  padding: 9px 16px;
+  padding: 9px 14px;
   border: 1px solid rgba(100, 200, 255, 0.2);
   border-radius: 8px;
   background: rgba(6, 6, 15, 0.85);
@@ -31,7 +36,7 @@
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 
-.backBtn:hover {
+.backBtn:hover, .musicBtn:hover {
   background: rgba(0, 229, 255, 0.1);
   border-color: rgba(0, 229, 255, 0.4);
   color: #fff;

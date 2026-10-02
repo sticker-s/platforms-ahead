@@ -62,6 +62,26 @@
   flex-wrap: wrap;
 }
 
+.audioBtn {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  padding: 8px 14px;
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 229, 255, 0.08);
+  color: #00e5ff;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+.audioBtn:hover {
+  background: rgba(0, 229, 255, 0.2);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.3);
+  transform: translateY(-1px);
+}
+
 /* User badge */
 .userBadge {
   display: flex;
