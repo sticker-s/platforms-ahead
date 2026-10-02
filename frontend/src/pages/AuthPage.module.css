@@ -1,0 +1,181 @@
+.page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at 30% 20%, rgba(123,47,255,0.15) 0%, transparent 55%),
+              radial-gradient(ellipse at 75% 80%, rgba(0,229,255,0.1) 0%, transparent 50%),
+              #06060f;
+  overflow: hidden;
+}
+
+.starCanvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.container {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  padding: 20px;
+  width: 100%;
+  max-width: 440px;
+}
+
+/* Decorative glowing orbs */
+.orb1 {
+  position: fixed;
+  width: 500px; height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(123,47,255,0.18) 0%, transparent 70%);
+  top: -180px; left: -160px;
+  pointer-events: none;
+}
+.orb2 {
+  position: fixed;
+  width: 400px; height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,229,255,0.12) 0%, transparent 70%);
+  bottom: -120px; right: -100px;
+  pointer-events: none;
+}
+
+/* Logo */
+.logo {
+  text-align: center;
+}
+.logoTitle {
+  font-size: clamp(36px, 8vw, 56px);
+  font-weight: 900;
+  letter-spacing: 6px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.logoSub {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  letter-spacing: 8px;
+  color: rgba(100,200,255,0.55);
+}
+
+/* Card */
+.card {
+  width: 100%;
+  padding: 32px 32px 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Tabs */
+.tabs {
+  position: relative;
+  display: flex;
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 28px;
+  gap: 0;
+}
+.tab {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.25s;
+  position: relative;
+  z-index: 2;
+}
+.tabActive {
+  color: #fff;
+}
+.tabIndicator {
+  position: absolute;
+  top: 4px; bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  background: linear-gradient(135deg, rgba(0,229,255,0.25), rgba(123,47,255,0.25));
+  border: 1px solid rgba(100,200,255,0.2);
+  border-radius: 6px;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 1;
+}
+.tabIndicatorRight {
+  transform: translateX(100%);
+}
+
+/* Form */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(100,200,255,0.65);
+  font-family: 'Orbitron', monospace;
+}
+
+.errorMsg {
+  font-size: 13px;
+  color: #ff5575;
+  background: rgba(255,60,80,0.1);
+  border: 1px solid rgba(255,60,80,0.2);
+  border-radius: 6px;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.successMsg {
+  font-size: 13px;
+  color: #5dce9e;
+  background: rgba(93,206,158,0.1);
+  border: 1px solid rgba(93,206,158,0.2);
+  border-radius: 6px;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+/* Switch hint */
+.switchHint {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255,255,255,0.35);
+}
+
+.switchBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--accent-cyan);
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s;
+}
+.switchBtn:hover { color: #fff; }

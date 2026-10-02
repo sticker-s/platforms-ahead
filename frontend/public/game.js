@@ -28,7 +28,7 @@ let stars = []
 let cameraY = 0
 let highestReached = 0
 let platformCount = 0
-let bestPlatforms = parseInt(localStorage.getItem('pa_best') || '0')
+let bestPlatforms = 0  // tracked in-memory; persisted on the server
 let spawnY = 0
 let frameCount = 0
 
@@ -436,10 +436,7 @@ function updatePlayer() {
       if (!p.counted) {
         p.counted = true
         platformCount++
-        if (platformCount > bestPlatforms) {
-          bestPlatforms = platformCount
-          localStorage.setItem('pa_best', bestPlatforms)
-        }
+        if (platformCount > bestPlatforms) bestPlatforms = platformCount
       }
 
       if (p.type === 'glass' && !p.cracking) {
@@ -782,6 +779,12 @@ const overlay = document.getElementById('overlay')
 
 function showGameOver() {
   const height = Math.max(0, Math.round(Math.abs(highestReached) / 8))
+
+  // Notify React to submit score to the leaderboard
+  if (typeof window.__onGameOver === 'function') {
+    window.__onGameOver(height, platformCount)
+  }
+
   overlay.innerHTML = `
     <h1 style="font-size:30px;letter-spacing:3px;color:#ff4060;
       text-shadow:0 0 20px rgba(255,60,80,0.7);margin-bottom:10px;">GAME OVER</h1>
