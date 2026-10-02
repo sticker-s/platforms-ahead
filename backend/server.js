@@ -34,9 +34,13 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
 
 // Serve static frontend in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/dist')))
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'))
+  const distPath = path.join(__dirname, '../frontend/dist')
+  app.use(express.static(distPath))
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(distPath, 'index.html'))
+    }
+    next()
   })
 }
 
