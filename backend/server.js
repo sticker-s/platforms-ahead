@@ -20,7 +20,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
 
 // Connect to MongoDB and start server
 const PORT = process.env.PORT || 3001
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/platformer'
+const MONGO_URI = process.env.MONGO_URI
 
 mongoose
   .connect(MONGO_URI)
