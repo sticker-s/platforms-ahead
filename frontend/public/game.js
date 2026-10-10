@@ -32,6 +32,8 @@ let platformCount = 0
 let bestPlatforms = 0  // tracked in-memory; persisted on the server
 let spawnY = 0
 let frameCount = 0
+let shakeX = 0
+let shakeY = 0
 
 let attackTimer = 0
 const ATTACK_DUR = 28
@@ -94,7 +96,7 @@ function drawPlayer() {
     const barW = 32
     const barH = 5
     const barX = player.x + player.w / 2 - barW / 2
-    const barY = screenY - 14
+    const barY = screenY - 52
     // Background
     c.fillStyle = 'rgba(0,0,0,0.55)'
     c.beginPath()
@@ -774,9 +776,9 @@ function drawCreature(cr) {
   c.rotate(tiltAngle)
 
   const skinColor = isFlash ? '#ffffff' : '#4a8c3a'
-  const darkSkin  = isFlash ? '#cccccc' : '#2e5c24'
+  const darkSkin = isFlash ? '#cccccc' : '#2e5c24'
   const rottColor = isFlash ? '#dddddd' : '#6daa56'
-  const glowCol   = isFlash ? '#ffffff' : '#22ff44'
+  const glowCol = isFlash ? '#ffffff' : '#22ff44'
 
   if (!isFlash) {
     c.shadowColor = '#22ff44'
@@ -797,7 +799,7 @@ function drawCreature(cr) {
     c.lineWidth = 1
     c.beginPath()
     c.moveTo(-4, -4 + walkBob); c.lineTo(-4, 8 + walkBob)
-    c.moveTo(2, -4 + walkBob);  c.lineTo(2, 8 + walkBob)
+    c.moveTo(2, -4 + walkBob); c.lineTo(2, 8 + walkBob)
     c.stroke()
   }
 
@@ -984,7 +986,7 @@ function showGameOver() {
 
   // Notify React to submit score to the leaderboard
   if (typeof window.__onGameOver === 'function') {
-    window.__onGameOver(height, platformCount)
+    window.__onGameOver(height, platformCount, score)
   }
 
   overlay.innerHTML = `
@@ -1048,9 +1050,27 @@ function startGame() {
   gameState = 'playing'
 }
 
+function applyShake() {
+  const height = getClimbedHeight()
+  if (gameState !== 'playing' || height < 1500) {
+    shakeX = 0
+    shakeY = 0
+    return
+  }
+  // Ramps from 1.5px at 1500m to max 4px at 2500m+
+  const t = Math.min(1, (height - 1500) / 1000)
+  const intensity = 1.5 + t * 2.5
+  // Sine rumble + random jitter for organic feel
+  const rumbleX = Math.sin(frameCount * 0.31) * intensity * 0.6
+  const rumbleY = Math.sin(frameCount * 0.19 + 1.2) * intensity * 0.4
+  shakeX = rumbleX + (Math.random() * 2 - 1) * intensity * 0.6
+  shakeY = rumbleY + (Math.random() * 2 - 1) * intensity * 0.4
+}
+
 function gameLoop() {
   requestAnimationFrame(gameLoop)
 
+  applyShake()
   drawBackground()
 
   if (gameState !== 'playing') {
@@ -1073,12 +1093,20 @@ function gameLoop() {
   checkMilestone()
   updateHUD()
 
+  // Apply screen shake for the game-object draw pass
+  c.save()
+  c.translate(shakeX, shakeY)
+
   for (const p of platforms) drawPlatform(p)
   for (const cr of creatures) drawCreature(cr)
   drawParticles()
   drawAttackArc()
   if (!player.dead) drawPlayer()
   updateAndDrawScorePopups()
+
+  c.restore()
+
+  // Drawn outside shake so it stays readable
   drawMilestoneBanner()
 }
 

@@ -17,7 +17,7 @@ function LeaderboardRow({ rank, entry, isCurrentUser }) {
         {isCurrentUser && <span className={styles.youBadge}>YOU</span>}
       </div>
       <div className={styles.score}>
-        <span className={styles.scoreVal}>{entry.bestHeight}<span className={styles.scoreUnit}>m</span></span>
+        <span className={styles.scoreVal}>{entry.bestScore}<span className={styles.scoreUnit}>pts</span></span>
       </div>
       <div className={styles.games}>{entry.gamesPlayed} <span className={styles.gamesLabel}>games</span></div>
     </div>
@@ -49,12 +49,12 @@ export default function HomePage({ user, onLogout, onPlay }) {
       // Find user's personal best in the leaderboard
       const myEntry = lb.find(e => e.userId === user.id)
       if (myEntry) {
-        setUserBest(myEntry.bestHeight)
+        setUserBest(myEntry.bestScore)
       } else {
         // Fetch from their personal scores if not in top 20
         try {
           const { scores } = await api.getUserScores(user.id)
-          if (scores.length > 0) setUserBest(scores[0].height)
+          if (scores.length > 0) setUserBest(scores[0].totalScore || scores[0].height)
         } catch {
           // ignore
         }
@@ -93,7 +93,7 @@ export default function HomePage({ user, onLogout, onPlay }) {
             <div className={styles.userInfo}>
               <div className={styles.userName}>{user.username}</div>
               {userBest !== null && (
-                <div className={styles.userBest}>Best: {userBest}m</div>
+                <div className={styles.userBest}>Best: {userBest} pts</div>
               )}
               {userRank > 0 && (
                 <div className={styles.userRank}>Rank #{userRank}</div>
@@ -183,7 +183,7 @@ export default function HomePage({ user, onLogout, onPlay }) {
               <div className={styles.rowHeader}>
                 <div className={styles.rank}>Rank</div>
                 <div className={styles.username}>Player</div>
-                <div className={styles.score}>Best Height</div>
+                <div className={styles.score}>Score</div>
                 <div className={styles.games}>Games</div>
               </div>
 

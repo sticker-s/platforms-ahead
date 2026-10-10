@@ -10,25 +10,29 @@ router.get('/leaderboard', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 100)
 
-    // Aggregate: for each user, get their highest height
+    // Aggregate: for each user, get their highest totalScore
     const leaderboard = await Score.aggregate([
       {
         $group: {
           _id: '$userId',
           username: { $first: '$username' },
+          bestScore: { $max: '$totalScore' },
           bestHeight: { $max: '$height' },
+          bestZombieScore: { $max: '$zombieScore' },
           bestPlatforms: { $max: '$platforms' },
           gamesPlayed: { $sum: 1 },
         },
       },
-      { $sort: { bestHeight: -1 } },
+      { $sort: { bestScore: -1 } },
       { $limit: limit },
       {
         $project: {
           _id: 0,
           userId: '$_id',
           username: 1,
+          bestScore: 1,
           bestHeight: 1,
+          bestZombieScore: 1,
           bestPlatforms: 1,
           gamesPlayed: 1,
         },
@@ -46,7 +50,7 @@ router.get('/leaderboard', async (req, res) => {
 // Submit a score after a game ends
 router.post('/', async (req, res) => {
   try {
-    const { userId, height, platforms } = req.body
+    const { userId, height, platforms, zombieScore } = req.body
 
     if (!userId || height === undefined) {
       return res.status(400).json({ error: 'userId and height are required.' })
@@ -61,10 +65,15 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'User not found.' })
     }
 
+    const zScore = Math.round(zombieScore || 0)
+    const total = Math.round(height) + zScore
+
     const score = await Score.create({
       userId: user._id,
       username: user.username,
       height: Math.round(height),
+      zombieScore: zScore,
+      totalScore: total,
       platforms: Math.round(platforms || 0),
     })
 
@@ -79,7 +88,7 @@ router.post('/', async (req, res) => {
 router.get('/user/:userId', async (req, res) => {
   try {
     const scores = await Score.find({ userId: req.params.userId })
-      .sort({ height: -1 })
+      .sort({ totalScore: -1 })
       .limit(10)
       .lean()
     return res.json({ scores })

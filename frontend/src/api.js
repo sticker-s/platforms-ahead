@@ -20,8 +20,8 @@ export const api = {
   getLeaderboard: (limit = 20) =>
     apiFetch(`/scores/leaderboard?limit=${limit}`),
 
-  submitScore: (userId, height, platforms) =>
-    apiFetch('/scores', { method: 'POST', body: JSON.stringify({ userId, height, platforms }) }),
+  submitScore: (userId, height, platforms, zombieScore) =>
+    apiFetch('/scores', { method: 'POST', body: JSON.stringify({ userId, height, platforms, zombieScore }) }),
 
   getUserScores: (userId) =>
     apiFetch(`/scores/user/${userId}`),
