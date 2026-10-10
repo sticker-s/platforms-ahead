@@ -21,12 +21,12 @@ export default function GamePage({ user, onBack }) {
 
   // Expose a callback that the game script can call on game-over
   useEffect(() => {
-    // The game calls window.__onGameOver(height, platforms) on death
-    window.__onGameOver = async (height, platforms) => {
+    // The game calls window.__onGameOver(height, platforms, zombieScore) on death
+    window.__onGameOver = async (height, platforms, zombieScore = 0) => {
       if (height <= 0) return
-      setLastScore({ height, platforms })
+      setLastScore({ height, platforms, zombieScore, total: height + zombieScore })
       try {
-        await api.submitScore(user.id, height, platforms)
+        await api.submitScore(user.id, height, platforms, zombieScore)
         setScoreSubmitted(true)
       } catch (err) {
         setSubmitError('Score could not be saved: ' + err.message)
@@ -73,7 +73,8 @@ export default function GamePage({ user, onBack }) {
       {/* Score toast */}
       {scoreSubmitted && lastScore && (
         <div className={styles.scoreToast} id="score-toast">
-          ✓ Score saved! &nbsp;<strong>{lastScore.height}m</strong>
+          ✓ Score saved! &nbsp;<strong>{lastScore.total} pts</strong>&nbsp;
+          <span style={{opacity:0.7, fontSize:'0.85em'}}>({lastScore.height}m + {lastScore.zombieScore} zombie pts)</span>
         </div>
       )}
       {submitError && (
