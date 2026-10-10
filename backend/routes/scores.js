@@ -13,10 +13,15 @@ router.get('/leaderboard', async (req, res) => {
     // Aggregate: for each user, get their highest totalScore
     const leaderboard = await Score.aggregate([
       {
+        $addFields: {
+          normalizedTotalScore: { $ifNull: ['$totalScore', '$height'] }
+        }
+      },
+      {
         $group: {
           _id: '$userId',
           username: { $first: '$username' },
-          bestScore: { $max: '$totalScore' },
+          bestScore: { $max: '$normalizedTotalScore' },
           bestHeight: { $max: '$height' },
           bestZombieScore: { $max: '$zombieScore' },
           bestPlatforms: { $max: '$platforms' },
@@ -88,7 +93,7 @@ router.post('/', async (req, res) => {
 router.get('/user/:userId', async (req, res) => {
   try {
     const scores = await Score.find({ userId: req.params.userId })
-      .sort({ totalScore: -1 })
+      .sort({ totalScore: -1, height: -1 })
       .limit(10)
       .lean()
     return res.json({ scores })
