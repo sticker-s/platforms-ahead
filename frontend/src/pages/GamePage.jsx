@@ -100,6 +100,10 @@ export default function GamePage({ user, onBack }) {
             <div className={styles.hudLabel}>Best</div>
             <div className={styles.hudValue} id="hud-best">0</div>
           </div>
+          <div className={styles.hudPanel}>
+            <div className={styles.hudLabel}>Score</div>
+            <div className={styles.hudValue} id="hud-score" style={{color:'#ffe566'}}>0</div>
+          </div>
         </div>
 
         {/* Legend */}
@@ -135,7 +139,7 @@ export default function GamePage({ user, onBack }) {
             <span className={styles.iAtk}>E</span> — Attack creatures &nbsp;|&nbsp; <span className={styles.iKey}>W × 2</span> — Double jump<br />
             Land on platforms to climb higher &amp; higher.<br />
             <span className={styles.iGlass}>Glass</span> platforms shatter after landing.<br />
-            Avoid <span className={styles.iDmg}>red creatures</span> — or swing to kill them!
+            Avoid <span className={styles.iDmg}>zombies</span> — or <kbd className={styles.kbd}>E</kbd> to kill them for <span style={{color:'#ffe566',fontWeight:700}}>+30 pts</span>! (2 hits = dead)
           </div>
           <div className={styles.playerInfo}>
             Playing as: <strong>{user.username}</strong>

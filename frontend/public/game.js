@@ -39,6 +39,10 @@ const ATTACK_RANGE = 150
 let attackCycle = 0
 let attackPressed = false
 
+let score = 0
+let playerHitCooldown = 0
+const HIT_COOLDOWN = 90  // ~1.5s invincibility after being hit
+
 const player = {
   x: 0, y: 0,
   w: 25, h: 34,
@@ -46,6 +50,8 @@ const player = {
   onGround: false,
   facingRight: true,
   dead: false,
+  hp: 2,
+  maxHp: 2,
   sprites: {},
 }
 
@@ -83,9 +89,43 @@ function drawPlayer() {
   const sp = player.sprites[currentKey]
   const screenY = player.y - cameraY
 
+  // --- Draw HP bar above player ---
+  if (!player.dead) {
+    const barW = 32
+    const barH = 5
+    const barX = player.x + player.w / 2 - barW / 2
+    const barY = screenY - 14
+    // Background
+    c.fillStyle = 'rgba(0,0,0,0.55)'
+    c.beginPath()
+    c.roundRect(barX - 1, barY - 1, barW + 2, barH + 2, 3)
+    c.fill()
+    // HP fill
+    const hpRatio = player.hp / player.maxHp
+    const hpColor = hpRatio > 0.5 ? '#00ff88' : '#ff4060'
+    c.fillStyle = hpColor
+    c.shadowColor = hpColor
+    c.shadowBlur = 6
+    c.beginPath()
+    c.roundRect(barX, barY, barW * hpRatio, barH, 2)
+    c.fill()
+    c.shadowBlur = 0
+    // Invincibility blink — flash bar border when invincible
+    if (playerHitCooldown > 0 && Math.floor(playerHitCooldown / 5) % 2 === 0) {
+      c.strokeStyle = '#ffffff'
+      c.lineWidth = 1
+      c.beginPath()
+      c.roundRect(barX - 1, barY - 1, barW + 2, barH + 2, 3)
+      c.stroke()
+    }
+  }
+
   if (!sp || !sp.image.complete || !sp.image.naturalWidth) {
+    // Draw invincibility tint when hit
+    c.globalAlpha = (playerHitCooldown > 0 && Math.floor(playerHitCooldown / 5) % 2 === 0) ? 0.4 : 1
     c.fillStyle = '#ffb700ff'
     c.fillRect(player.x, screenY, player.w, player.h)
+    c.globalAlpha = 1
     return
   }
 
@@ -111,7 +151,12 @@ function drawPlayer() {
   const sx = player.x - (dw - player.w) / 2
   const sy = screenY - (dh - player.h)
 
+  // Blink player sprite when invincible
+  if (playerHitCooldown > 0 && Math.floor(playerHitCooldown / 5) % 2 === 0) {
+    c.globalAlpha = 0.35
+  }
   c.drawImage(sp.image, sp.currentFrame * fw, 0, fw, fh, sx, sy, dw, dh)
+  c.globalAlpha = 1
 }
 
 function fillRoundRect(x, y, w, h, r) {
@@ -269,13 +314,39 @@ function doAttack() {
     ) {
       cr.hp = 0
       cr.alive = false
+      score += 30
       spawnParticles(cr.x + cr.w / 2, cr.y + cr.h / 2, '#ff4060', 16)
       spawnParticles(cr.x + cr.w / 2, cr.y + cr.h / 2, '#ffcc00', 8)
+      spawnScorePopup(cr.x + cr.w / 2, cr.y - cameraY - 10, '+30')
     }
   }
 
   const tipX = player.facingRight ? player.x + player.w + 10 : player.x - 10
   spawnParticles(tipX, player.y + player.h * 0.4, '#ffffffcc', 5)
+}
+
+let scorePopups = []
+
+function spawnScorePopup(x, y, text) {
+  scorePopups.push({ x, y, text, life: 1.0, vy: -1.2 })
+}
+
+function updateAndDrawScorePopups() {
+  scorePopups = scorePopups.filter(p => p.life > 0)
+  for (const p of scorePopups) {
+    p.y += p.vy
+    p.life -= 0.018
+    const alpha = Math.min(1, p.life * 2)
+    c.save()
+    c.globalAlpha = alpha
+    c.font = 'bold 15px Orbitron, monospace'
+    c.textAlign = 'center'
+    c.fillStyle = '#ffe566'
+    c.shadowColor = '#ffcc00'
+    c.shadowBlur = 10
+    c.fillText(p.text, p.x, p.y)
+    c.restore()
+  }
 }
 
 function spawnParticles(x, y, color, count = 8) {
@@ -364,12 +435,14 @@ function updateCamera() {
 const hudPlatforms = document.getElementById('hud-platforms')
 const hudHeight = document.getElementById('hud-height')
 const hudBest = document.getElementById('hud-best')
+const hudScore = document.getElementById('hud-score')
 
 function updateHUD() {
   const height = getClimbedHeight()
   hudPlatforms.textContent = platformCount
   hudHeight.textContent = height + 'm'
   hudBest.textContent = bestPlatforms
+  if (hudScore) hudScore.textContent = score
   if (window.__audioManager) {
     window.__audioManager.updateHeight(height)
   }
@@ -479,6 +552,8 @@ function updatePlayer() {
     }
   }
 
+  if (playerHitCooldown > 0) playerHitCooldown--
+
   if (attackTimer <= 0) {
     for (const cr of creatures) {
       if (!cr.alive) continue
@@ -488,7 +563,12 @@ function updatePlayer() {
         player.y < cr.y + cr.h - 4 &&
         player.y + player.h > cr.y + 4
       )
-      if (overlap) { killPlayer(); return }
+      if (overlap && playerHitCooldown <= 0) {
+        player.hp--
+        playerHitCooldown = HIT_COOLDOWN
+        spawnParticles(player.x + player.w / 2, player.y + player.h / 2, '#ff4060', 10)
+        if (player.hp <= 0) { killPlayer(); return }
+      }
     }
   }
 
@@ -679,61 +759,140 @@ function drawPlatform(p) {
 function drawCreature(cr) {
   if (!cr.alive) return
   const sy = cr.y - cameraY
-  if (sy < -60 || sy > canvas.height + 60) return
+  if (sy < -80 || sy > canvas.height + 80) return
 
   cr.animPhase += 0.07
   c.save()
 
-  const pulse = 0.88 + 0.12 * Math.sin(cr.animPhase)
-  const rx = (cr.w / 2) * pulse
-  const ry = (cr.h / 2) * pulse
+  const cx = cr.x + cr.w / 2
+  const isFlash = cr.hitFlash > 0
+  const walkBob = Math.sin(cr.animPhase * 1.4) * 2
+  const tiltAngle = cr.vx > 0 ? 0.12 : -0.12
 
-  if (cr.hitFlash > 0) {
-    c.fillStyle = `rgba(255,255,255,${cr.hitFlash / 12})`
-    c.shadowColor = '#ffffff'
-    c.shadowBlur = 18
+  // Translate to centre for tilt
+  c.translate(cx, sy + cr.h / 2)
+  c.rotate(tiltAngle)
+
+  const skinColor = isFlash ? '#ffffff' : '#4a8c3a'
+  const darkSkin  = isFlash ? '#cccccc' : '#2e5c24'
+  const rottColor = isFlash ? '#dddddd' : '#6daa56'
+  const glowCol   = isFlash ? '#ffffff' : '#22ff44'
+
+  if (!isFlash) {
+    c.shadowColor = '#22ff44'
+    c.shadowBlur = 12
   } else {
-    c.fillStyle = '#ff2244'
-    c.shadowColor = '#ff0033'
-    c.shadowBlur = 16
+    c.shadowColor = '#ffffff'
+    c.shadowBlur = 20
   }
 
+  // --- BODY (torso) ---
+  c.fillStyle = skinColor
   c.beginPath()
-  c.ellipse(cr.x + cr.w / 2, sy + cr.h / 2, rx, ry, 0, 0, Math.PI * 2)
+  c.roundRect(-9, -8 + walkBob, 18, 18, [3])
   c.fill()
-  c.strokeStyle = '#ff8899'
-  c.lineWidth = 1.5
-  c.stroke()
+  // tattered shirt lines
+  if (!isFlash) {
+    c.strokeStyle = darkSkin
+    c.lineWidth = 1
+    c.beginPath()
+    c.moveTo(-4, -4 + walkBob); c.lineTo(-4, 8 + walkBob)
+    c.moveTo(2, -4 + walkBob);  c.lineTo(2, 8 + walkBob)
+    c.stroke()
+  }
+
+  // --- HEAD ---
+  c.fillStyle = skinColor
+  c.shadowBlur = isFlash ? 20 : 8
+  c.beginPath()
+  // Slightly asymmetric (deformed) head
+  c.ellipse(1, -18 + walkBob, 9, 10, 0.15, 0, Math.PI * 2)
+  c.fill()
+  // skull rot patch
+  if (!isFlash) {
+    c.fillStyle = darkSkin
+    c.beginPath()
+    c.ellipse(-3, -21 + walkBob, 3, 2.5, 0.3, 0, Math.PI * 2)
+    c.fill()
+  }
+
   c.shadowBlur = 0
 
-  if (cr.hitFlash <= 0) {
-    const eyeDir = cr.vx > 0 ? 6 : -6
-    c.fillStyle = '#fff'
+  // --- EYES ---
+  const eyeOffX = cr.vx > 0 ? 1 : -1
+  // Left eye – red glowing
+  c.fillStyle = isFlash ? '#fff' : '#ff0000'
+  c.beginPath()
+  c.ellipse(-3 + eyeOffX, -19 + walkBob, 2.5, 2, 0, 0, Math.PI * 2)
+  c.fill()
+  // Right eye – hollow / missing
+  c.fillStyle = isFlash ? '#fff' : '#111'
+  c.beginPath()
+  c.ellipse(5 + eyeOffX, -18 + walkBob, 2, 2, 0, 0, Math.PI * 2)
+  c.fill()
+  if (!isFlash) {
+    c.fillStyle = '#ff4400'
     c.beginPath()
-    c.arc(cr.x + cr.w / 2 + eyeDir - 4, sy + 11, 4, 0, Math.PI * 2)
-    c.arc(cr.x + cr.w / 2 + eyeDir + 4, sy + 11, 4, 0, Math.PI * 2)
+    c.arc(5 + eyeOffX, -18 + walkBob, 0.8, 0, Math.PI * 2)
     c.fill()
-    c.fillStyle = '#111'
+  }
+
+  // --- MOUTH (jagged grin) ---
+  if (!isFlash) {
+    c.strokeStyle = '#111'
+    c.lineWidth = 1.2
     c.beginPath()
-    c.arc(cr.x + cr.w / 2 + eyeDir - 4, sy + 11, 2, 0, Math.PI * 2)
-    c.arc(cr.x + cr.w / 2 + eyeDir + 4, sy + 11, 2, 0, Math.PI * 2)
-    c.fill()
+    c.moveTo(-5 + eyeOffX, -12 + walkBob)
+    for (let t = 0; t <= 4; t++) {
+      const mx = -5 + eyeOffX + t * 2.5
+      const my = -12 + walkBob + (t % 2 === 0 ? 0 : 2.5)
+      c.lineTo(mx, my)
+    }
+    c.stroke()
+  }
 
-    const barW = cr.w
-    c.fillStyle = 'rgba(0,0,0,0.6)'
-    c.fillRect(cr.x, sy - 10, barW, 4)
-    c.fillStyle = '#00ff88'
-    c.fillRect(cr.x, sy - 10, barW, 4)
+  // --- ARMS (dangling) ---
+  c.strokeStyle = skinColor
+  c.lineWidth = 4
+  c.lineCap = 'round'
+  // left arm – dragging forward
+  const lArmSwing = Math.sin(cr.animPhase) * 6
+  c.beginPath()
+  c.moveTo(-9, -4 + walkBob)
+  c.quadraticCurveTo(-18, 4, -14 + lArmSwing, 14 + walkBob)
+  c.stroke()
+  // right arm – reaching out zombie-style
+  const rArmReach = cr.vx > 0 ? 14 : -14
+  const rArmSwing = Math.sin(cr.animPhase + 1) * 4
+  c.beginPath()
+  c.moveTo(9, -4 + walkBob)
+  c.quadraticCurveTo(18, 0, rArmReach + rArmSwing, -2 + walkBob)
+  c.stroke()
 
-    c.strokeStyle = '#ff6677'
-    c.lineWidth = 2.5
-    for (let i = 0; i < 4; i++) {
-      const lx = cr.x + 4 + i * 8
-      const phase = cr.animPhase + i * 0.9
+  // --- LEGS (stumbling walk) ---
+  c.strokeStyle = darkSkin
+  c.lineWidth = 5
+  const legL = Math.sin(cr.animPhase) * 7
+  const legR = Math.sin(cr.animPhase + Math.PI) * 7
+  // left leg
+  c.beginPath()
+  c.moveTo(-5, 10 + walkBob)
+  c.lineTo(-5 + legL, 24)
+  c.stroke()
+  // right leg
+  c.beginPath()
+  c.moveTo(5, 10 + walkBob)
+  c.lineTo(5 + legR, 24)
+  c.stroke()
+
+  // --- Dripping gore detail ---
+  if (!isFlash) {
+    c.fillStyle = '#1a6e0e'
+    for (let i = 0; i < 3; i++) {
+      const drip = Math.sin(cr.animPhase * 0.5 + i * 1.3) * 2
       c.beginPath()
-      c.moveTo(lx, sy + cr.h - 4)
-      c.lineTo(lx + Math.sin(phase) * 5, sy + cr.h + 8)
-      c.stroke()
+      c.ellipse(-6 + i * 5, 10 + walkBob + drip, 1.5, 2.5 + drip * 0.5, 0, 0, Math.PI * 2)
+      c.fill()
     }
   }
 
@@ -833,6 +992,7 @@ function showGameOver() {
       text-shadow:0 0 20px rgba(255,60,80,0.7);margin-bottom:10px;">GAME OVER</h1>
     <div style="font-family:Inter,sans-serif;color:rgba(255,255,255,0.55);
       font-size:14px;text-align:center;line-height:2.2;margin-bottom:18px;">
+      Zombie kills score: <span style="color:#ffe566;font-weight:700">${score} pts</span><br>
       Platforms cleared: <span style="color:#fff;font-weight:700">${platformCount}</span><br>
       Height reached: <span style="color:#fff;font-weight:700">${height}m</span><br>
       Best ever: <span style="color:#00e5ff;font-weight:700">${bestPlatforms} platforms</span>
@@ -859,20 +1019,24 @@ function startGame() {
   }
   overlay.style.display = 'none'
   platformCount = 0
+  score = 0
   cameraY = 0
   frameCount = 0
   attackTimer = 0
   attackCycle = 0
+  playerHitCooldown = 0
   milestoneMsg = ''
   milestoneTimer = 0
   creatures = []
   particles = []
+  scorePopups = []
   player.x = canvas.width / 2 - player.w / 2
   player.y = canvas.height * 0.75
   highestReached = player.y
   player.vx = 0
   player.vy = 0
   player.dead = false
+  player.hp = player.maxHp
   player.onGround = false
   currentKey = 'Idle'
   jumpQueued = false
@@ -914,6 +1078,7 @@ function gameLoop() {
   drawParticles()
   drawAttackArc()
   if (!player.dead) drawPlayer()
+  updateAndDrawScorePopups()
   drawMilestoneBanner()
 }
 
